@@ -12,6 +12,12 @@ npm run build
 BRANCH="gh-pages"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/diary-deploy-XXXXXX")"
 
+# 커밋 작성자 정보가 없으면 이 저장소의 GitHub 계정 이름으로 남깁니다.
+IDENT=()
+if ! git config user.email >/dev/null 2>&1 || [ -z "$(git config user.email || true)" ]; then
+  IDENT=(-c user.name="ginsaram" -c user.email="297652998+ginsaram@users.noreply.github.com")
+fi
+
 echo "2/3 배포 브랜치 준비 중..."
 git worktree add --detach --quiet "$WORK" HEAD
 
@@ -24,7 +30,7 @@ git worktree add --detach --quiet "$WORK" HEAD
   # GitHub Pages 가 Jekyll 처리를 하지 않도록 합니다.
   touch .nojekyll
   git add -A
-  git commit -q -m "배포: $(date '+%Y-%m-%d %H:%M')"
+  git "${IDENT[@]}" commit -q -m "배포: $(date '+%Y-%m-%d %H:%M')"
   git push -f origin "HEAD:refs/heads/$BRANCH"
 )
 

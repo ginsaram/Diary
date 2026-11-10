@@ -35,6 +35,7 @@ import {
   countEntries,
   totalSize,
   formatBytes,
+  byteSize,
   compressImage,
   readFileAsText
 } from './utils/diary';
@@ -426,7 +427,7 @@ export default function App() {
 
       setBackupMessage({
         type: 'success',
-        text: `백업 파일을 내려받았습니다. 일기 ${countEntries(diaries)}편, 계획 ${routines.length}개, 크기 ${formatBytes(text.length)}`
+        text: `백업 파일을 내려받았습니다. 일기 ${countEntries(diaries)}편, 계획 ${routines.length}개, 크기 ${formatBytes(byteSize(text))}`
       });
       setStorageError(null);
       const now = new Date().toISOString();
@@ -1251,7 +1252,7 @@ export default function App() {
                 </h3>
 
                 <p className="text-xs text-amber-800 leading-relaxed">
-                  일기는 이 폰의 브라우저 안에만 저장됩니다. 폰을 바꾸거나 앱 기록를 지우면 함께 사라지니,
+                  일기는 이 폰의 브라우저 안에만 저장됩니다. 폰을 바꾸거나 브라우저 기록을 지우면 함께 사라지니,
                   가끔 <strong>백업 파일</strong>을 내려받아 드라이브·메일 같은 안전한 곳에 보관해 주세요.
                 </p>
 
