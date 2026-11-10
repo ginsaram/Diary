@@ -1,0 +1,20 @@
+{
+  "name": "하루 성찰 – 나를 안아주는 마음 일기장",
+  "short_name": "하루 성찰",
+  "description": "매일의 성찰 일기, 사진, 실천 계획을 폰에서 바로 기록하고 백업하는 마음 일기장",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFBEB",
+  "theme_color": "#FFFDF9",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
