@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Calendar, 
   Lock, 
@@ -11,54 +11,91 @@ import {
   Sparkles, 
   ChevronLeft, 
   ChevronRight, 
-  User, 
   RefreshCw,
   PlusCircle,
   Eye,
   EyeOff,
-  Type
+  Type,
+  Download,
+  Upload,
+  AlertTriangle
 } from 'lucide-react';
+import {
+  STORAGE_KEYS,
+  DEFAULT_PASSCODE,
+  todayISO,
+  addDaysISO,
+  formatKoreanDate,
+  loadJSON,
+  safeSetItem,
+  buildBackup,
+  buildExportFileName,
+  parseBackup,
+  mergeBackup,
+  countEntries,
+  totalSize,
+  formatBytes,
+  compressImage,
+  readFileAsText
+} from './utils/diary';
 
-// Firebase 및 API 키 기본 설정
-const apiKey = ""; // API 실행 환경에서 자동으로 채워집니다.
+// Imagen 배경 생성용 키 (비어 있으면 AI 배경 생성 기능이 잠깁니다)
+const apiKey = "";
+// 브라우저 저장 공간(localStorage) 한도는 보통 5MB 정도입니다.
+const STORAGE_LIMIT_BYTES = 5 * 1024 * 1024;
 
 export default function App() {
   // --- 상태 관리 ---
   const [isLocked, setIsLocked] = useState(true);
-  const [passcode, setPasscode] = useState(() => localStorage.getItem('diary_passcode') || '11');
+  const [passcode, setPasscode] = useState(() => {
+    try {
+      return localStorage.getItem(STORAGE_KEYS.passcode) || DEFAULT_PASSCODE;
+    } catch {
+      return DEFAULT_PASSCODE;
+    }
+  });
   const [enteredDigits, setEnteredDigits] = useState('');
   const [isPasscodeVisible, setIsPasscodeVisible] = useState(false);
 
-  // 현재 선택된 날짜 (YYYY-MM-DD)
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
-  });
+  // 현재 선택된 날짜 (YYYY-MM-DD, 기기 시간대 기준)
+  const [selectedDate, setSelectedDate] = useState(() => todayISO());
 
   // 다이어리 데이터 { "YYYY-MM-DD": { text: "", images: ["base64...", "base64..."] } }
-  const [diaries, setDiaries] = useState(() => {
-    const saved = localStorage.getItem('diary_entries');
-    return saved ? JSON.parse(saved) : {};
-  });
+  const [diaries, setDiaries] = useState(() => loadJSON(STORAGE_KEYS.entries, {}));
 
   // 나의 루틴 계획 리스트 [{ id, name, startDate, endDate }] - 최대 5개
   const [routines, setRoutines] = useState(() => {
-    const saved = localStorage.getItem('diary_routines');
-    return saved ? JSON.parse(saved) : [
-      { id: '1', name: '팔굽혀 펴기 100개', startDate: new Date().toISOString().split('T')[0], endDate: new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0] },
-      { id: '2', name: '매일 책 10페이지 읽기', startDate: new Date().toISOString().split('T')[0], endDate: new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0] }
+    const saved = loadJSON(STORAGE_KEYS.routines, null);
+    if (Array.isArray(saved)) return saved.slice(0, 5);
+    return [
+      { id: '1', name: '팔굽혀 펴기 100개', startDate: todayISO(), endDate: addDaysISO(todayISO(), 7) },
+      { id: '2', name: '매일 책 10페이지 읽기', startDate: todayISO(), endDate: addDaysISO(todayISO(), 30) }
     ];
   });
 
   // 루틴 완료 기록 { "YYYY-MM-DD": ["routine_id_1", "routine_id_2"] }
-  const [completedRoutines, setCompletedRoutines] = useState(() => {
-    const saved = localStorage.getItem('diary_completed_routines');
-    return saved ? JSON.parse(saved) : {};
-  });
+  const [completedRoutines, setCompletedRoutines] = useState(() => loadJSON(STORAGE_KEYS.completed, {}));
 
   // 앱 설정 관련
-  const [fontSize, setFontSize] = useState(() => localStorage.getItem('diary_font_size') || 'base'); // sm, base, lg, xl
-  const [coverImage, setCoverImage] = useState(() => localStorage.getItem('diary_cover_image') || 'default');
+  const [fontSize, setFontSize] = useState(() => {
+    try {
+      return localStorage.getItem(STORAGE_KEYS.fontSize) || 'base'; // sm, base, lg, xl
+    } catch {
+      return 'base';
+    }
+  });
+  const [coverImage, setCoverImage] = useState(() => {
+    try {
+      return localStorage.getItem(STORAGE_KEYS.coverImage) || 'default';
+    } catch {
+      return 'default';
+    }
+  });
+
+  // 저장 공간 부족 등 저장 실패 알림
+  const [storageError, setStorageError] = useState(null);
+  // 백업/복원 결과 메시지
+  const [backupMessage, setBackupMessage] = useState({ text: '', type: '' });
   
   // UI 내비게이션 탭 ('diary', 'routine', 'settings')
   const [activeTab, setActiveTab] = useState('diary');
@@ -66,8 +103,8 @@ export default function App() {
   // 모달 및 서브 상태
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [newRoutineName, setNewRoutineName] = useState('');
-  const [newRoutineStart, setNewRoutineStart] = useState(() => new Date().toISOString().split('T')[0]);
-  const [newRoutineEnd, setNewRoutineEnd] = useState(() => new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0]);
+  const [newRoutineStart, setNewRoutineStart] = useState(() => todayISO());
+  const [newRoutineEnd, setNewRoutineEnd] = useState(() => addDaysISO(todayISO(), 7));
   
   // 비밀번호 변경 입력칸
   const [currentPassInput, setCurrentPassInput] = useState('');
@@ -82,35 +119,57 @@ export default function App() {
 
   // 사진 업로드 Ref
   const fileInputRef = useRef(null);
+  // 백업 파일 불러오기 Ref
+  const importInputRef = useRef(null);
 
-  // --- 자동 저장 효과 ---
+  // --- 자동 저장 (저장 실패를 조용히 넘기지 않고 화면에 알립니다) ---
+  const persist = (key, value) => {
+    const result = safeSetItem(key, value);
+    setStorageError(result.ok ? null : { key, message: result.message, quota: result.quota });
+    return result.ok;
+  };
+
   useEffect(() => {
-    localStorage.setItem('diary_entries', JSON.stringify(diaries));
+    persist(STORAGE_KEYS.entries, JSON.stringify(diaries));
   }, [diaries]);
 
   useEffect(() => {
-    localStorage.setItem('diary_routines', JSON.stringify(routines));
+    persist(STORAGE_KEYS.routines, JSON.stringify(routines));
   }, [routines]);
 
   useEffect(() => {
-    localStorage.setItem('diary_completed_routines', JSON.stringify(completedRoutines));
+    persist(STORAGE_KEYS.completed, JSON.stringify(completedRoutines));
   }, [completedRoutines]);
 
   useEffect(() => {
-    localStorage.setItem('diary_passcode', passcode);
+    persist(STORAGE_KEYS.passcode, passcode);
   }, [passcode]);
 
   useEffect(() => {
-    localStorage.setItem('diary_font_size', fontSize);
+    persist(STORAGE_KEYS.fontSize, fontSize);
   }, [fontSize]);
 
-  // --- 날짜 포맷 함수 ---
-  const formatKoreanDate = (dateStr) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    const weeks = ['일', '월', '화', '수', '목', '금', '토'];
-    return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일 (${weeks[date.getDay()]}요일)`;
-  };
+  useEffect(() => {
+    persist(STORAGE_KEYS.coverImage, coverImage);
+  }, [coverImage]);
+
+  // 저장 공간 사용량 (사진이 많아지면 금방 5MB를 넘기 때문입니다)
+  const usedBytes = useMemo(
+    () => totalSize(diaries, routines, completedRoutines),
+    [diaries, routines, completedRoutines]
+  );
+  const photoCount = useMemo(
+    () => Object.values(diaries || {}).reduce((sum, entry) => sum + (entry && Array.isArray(entry.images) ? entry.images.length : 0), 0),
+    [diaries]
+  );
+  const usedRatio = Math.min(1, usedBytes / STORAGE_LIMIT_BYTES);
+  const [lastBackupAt, setLastBackupAt] = useState(() => {
+    try {
+      return localStorage.getItem('diary_last_backup_at') || null;
+    } catch {
+      return null;
+    }
+  });
 
   // --- 잠금 해제 처리 ---
   const handleDigitClick = (num) => {
@@ -157,37 +216,42 @@ export default function App() {
     }
   };
 
-  const handlePhotoChange = (e) => {
-    const files = Array.from(e.target.files);
+  const handlePhotoChange = async (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
     if (!files.length) return;
 
-    const currentEntry = diaries[selectedDate] || { text: "", images: [] };
-    const currentImages = currentEntry.images || [];
+    const entry = diaries[selectedDate] || { text: "", images: [] };
+    const room = 2 - (entry.images || []).length;
 
-    if (currentImages.length + files.length > 2) {
-      alert("하루에 사진은 최대 2장까지만 첨부할 수 있습니다.");
+    if (room <= 0) {
+      alert("하루에 사진은 최대 2장까지 첨부할 수 있습니다.");
       return;
     }
+    if (files.length > room) {
+      alert(`사진은 하루 최대 2장까지만 담을 수 있어 ${room}장만 추가합니다.`);
+    }
 
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setDiaries(prev => {
-          const entry = prev[selectedDate] || { text: "", images: [] };
-          const images = [...(entry.images || []), reader.result];
-          return {
-            ...prev,
-            [selectedDate]: {
-              ...entry,
-              images: images.slice(0, 2) // 방어막으로 한 번 더 2장 제한
-            }
-          };
-        });
-      };
-      reader.readAsDataURL(file);
-    });
-    // 인풋 리셋
-    e.target.value = '';
+    for (const file of files.slice(0, room)) {
+      // 폰 사진 원본은 한 장에 몇 MB라서 그대로 저장하면 금방 저장 공간이 차집니다.
+      // 붙이기 전에 긴 변 1400px 로 줄여 저장합니다.
+      const dataUrl = await compressImage(file);
+      if (!dataUrl) {
+        alert("사진을 읽지 못했습니다. 다른 사진으로 다시 시도해 주세요.");
+        continue;
+      }
+      setDiaries(prev => {
+        const current = prev[selectedDate] || { text: "", images: [] };
+        const images = [...(current.images || []), dataUrl];
+        return {
+          ...prev,
+          [selectedDate]: {
+            ...current,
+            images: images.slice(0, 2) // 방어막으로 한 번 더 2장 제한
+          }
+        };
+      });
+    }
   };
 
   const deletePhoto = (indexToDelete) => {
@@ -290,6 +354,10 @@ export default function App() {
 
   // --- AI 이미지 생성 (Imagen 4.0) ---
   const generateAIImage = async () => {
+    if (!apiKey) {
+      setImageError("AI 배경 생성 기능은 아직 준비 중입니다. 지금은 기본 일러스트를 그대로 사용해 주세요.");
+      return;
+    }
     if (!aiPrompt.trim()) return;
     setIsGeneratingImage(true);
     setImageError('');
@@ -317,14 +385,13 @@ export default function App() {
         if (base64Bytes) {
           const generatedUrl = `data:image/png;base64,${base64Bytes}`;
           setCoverImage(generatedUrl);
-          localStorage.setItem('diary_cover_image', generatedUrl);
           setIsGeneratingImage(false);
           alert("나만의 감성을 담은 다이어리 배경 이미지가 생성되어 반영되었습니다!");
           return;
         } else {
           throw new Error("이미지 데이터가 응답에 없습니다.");
         }
-      } catch (err) {
+      } catch {
         if (attempt === 5) {
           setImageError("네트워크 상태가 불안정하여 AI 이미지 생성에 실패했습니다. 다시 한 번 시도해 주세요.");
           setIsGeneratingImage(false);
@@ -339,8 +406,90 @@ export default function App() {
 
   const handleResetCover = () => {
     setCoverImage('default');
-    localStorage.removeItem('diary_cover_image');
     alert("기본 키다리 아저씨 일러스트로 환원되었습니다.");
+  };
+
+  // --- 백업 파일 내려받기 ---
+  const handleExportBackup = () => {
+    try {
+      const payload = buildBackup({ diaries, routines, completedRoutines, passcode, fontSize, coverImage });
+      const text = JSON.stringify(payload, null, 2);
+      const blob = new Blob([text], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = buildExportFileName();
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+      setBackupMessage({
+        type: 'success',
+        text: `백업 파일을 내려받았습니다. 일기 ${countEntries(diaries)}편, 계획 ${routines.length}개, 크기 ${formatBytes(text.length)}`
+      });
+      setStorageError(null);
+      const now = new Date().toISOString();
+      const savedAt = safeSetItem('diary_last_backup_at', now);
+      if (savedAt.ok) setLastBackupAt(now);
+    } catch {
+      setBackupMessage({
+        type: 'error',
+        text: '백업 파일을 만들지 못했습니다. 폰의 저장 공간을 한 번 확인한 뒤 다시 시도해 주세요.'
+      });
+    }
+  };
+
+  // --- 백업 파일 불러와 합치기 ---
+  const handleImportBackup = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+
+    setBackupMessage({ text: '', type: '' });
+
+    let text = '';
+    try {
+      text = await readFileAsText(file);
+    } catch {
+      setBackupMessage({ type: 'error', text: '파일을 읽지 못했습니다. 다시 시도해 주세요.' });
+      return;
+    }
+
+    const parsed = parseBackup(text);
+    if (!parsed.ok) {
+      setBackupMessage({ type: 'error', text: parsed.error });
+      return;
+    }
+
+    const merged = mergeBackup(diaries, routines, completedRoutines, parsed);
+
+    if (merged.addedEntries === 0 && merged.addedRoutines === 0 && merged.addedChecks === 0) {
+      setBackupMessage({
+        type: 'success',
+        text: '이 백업 파일의 기록은 이미 모두 이 폰에 들어 있습니다. 바뀐 것은 없습니다.'
+      });
+      return;
+    }
+
+    const ok = confirm(
+      `백업 파일에서 일기 ${countEntries(parsed.diaries)}편, 계획 ${parsed.routines.length}개를 찾았습니다.\n\n` +
+      `지금 기록에 더합니다. (겹치는 날짜는 지금 기록을 그대로 두고, 없는 날짜만 채웁니다)\n` +
+      `지금 기록이 지워지지는 않습니다.\n\n계속할까요?`
+    );
+    if (!ok) return;
+
+    setDiaries(merged.diaries);
+    setRoutines(merged.routines);
+    setCompletedRoutines(merged.completedRoutines);
+    if (parsed.settings.fontSize) setFontSize(parsed.settings.fontSize);
+    if (parsed.settings.passcode) setPasscode(parsed.settings.passcode);
+    if (parsed.settings.coverImage) setCoverImage(parsed.settings.coverImage);
+
+    setBackupMessage({
+      type: 'success',
+      text: `복원했습니다. 일기 ${merged.addedEntries}편, 계획 ${merged.addedRoutines}개, 계획 체크 ${merged.addedChecks}개를 새로 담았습니다.`
+    });
   };
 
   // --- 폰트 사이즈 클래스 매핑 ---
@@ -366,8 +515,6 @@ export default function App() {
         return { body: 'text-base', title: 'text-xl', label: 'text-sm', btn: 'text-sm' };
     }
   };
-
-  const fontStyle = getFontSizeStyles();
 
   // --- 일기 입력창 텍스트 조회 ---
   const currentDiaryText = diaries[selectedDate]?.text || "";
@@ -476,12 +623,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 비밀번호 힌트 제공 (처음 접근 시 편의성 증진) */}
-              <div className="mt-4 text-center">
-                <span className="text-xs text-amber-800 bg-amber-100 px-3 py-1.5 rounded-full inline-block font-medium">
-                  💡 초기 비밀번호는 <strong className="text-amber-900 underline">11</strong> 입니다.
-                </span>
-              </div>
             </div>
 
             {/* 하단 패스코드 키패드 영역 */}
@@ -573,6 +714,28 @@ export default function App() {
 
         {/* 본문 스크롤 영역 */}
         <main className={`flex-1 overflow-y-auto px-5 py-4 pb-24 ${getFontSizeClass()}`} style={{ fontSize: getFontSizeStyles().body }}>
+
+          {/* 저장 실패 알림 (조용히 사라지면 일기가 사라지므로 화면에 남깁니다) */}
+          {storageError && (
+            <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-3">
+              <div className="flex items-start space-x-2">
+                <AlertTriangle size={16} className="mt-0.5 text-red-600 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-xs font-bold text-red-700">{storageError.message}</p>
+                  <p className="text-[11px] text-red-600 mt-1 leading-relaxed">
+                    방금 적은 내용이 저장되지 않았을 수 있습니다. 지금 백업 파일을 받아 두면 기록을 잃지 않습니다.
+                  </p>
+                  <button
+                    onClick={handleExportBackup}
+                    className="mt-2 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold flex items-center space-x-1"
+                  >
+                    <Download size={12} />
+                    <span>지금 백업 파일 받기</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           
           {/* ======================================= */}
           {/* 탭 1: 일기 쓰기 화면 */}
@@ -587,11 +750,7 @@ export default function App() {
                 <div className="flex items-center justify-between w-full">
                   {/* 이전 날짜 버튼 */}
                   <button 
-                    onClick={() => {
-                      const d = new Date(selectedDate);
-                      d.setDate(d.getDate() - 1);
-                      setSelectedDate(d.toISOString().split('T')[0]);
-                    }}
+                    onClick={() => setSelectedDate(addDaysISO(selectedDate, -1))}
                     className="p-1.5 rounded-full hover:bg-amber-200 text-amber-900 transition"
                   >
                     <ChevronLeft size={20} />
@@ -608,11 +767,7 @@ export default function App() {
 
                   {/* 다음 날짜 버튼 */}
                   <button 
-                    onClick={() => {
-                      const d = new Date(selectedDate);
-                      d.setDate(d.getDate() + 1);
-                      setSelectedDate(d.toISOString().split('T')[0]);
-                    }}
+                    onClick={() => setSelectedDate(addDaysISO(selectedDate, 1))}
                     className="p-1.5 rounded-full hover:bg-amber-200 text-amber-900 transition"
                   >
                     <ChevronRight size={20} />
@@ -1086,6 +1241,80 @@ export default function App() {
                     </button>
                   </div>
                 </div>
+              </div>
+
+              {/* 4. 기록 백업과 복원 */}
+              <div className="bg-white border border-amber-100 rounded-2xl p-4 shadow-sm space-y-3">
+                <h3 className="font-bold text-amber-950 text-sm flex items-center space-x-1.5 border-b border-amber-50 pb-2">
+                  <Download size={16} className="text-amber-700" />
+                  <span>기록 백업과 복원</span>
+                </h3>
+
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  일기는 이 폰의 브라우저 안에만 저장됩니다. 폰을 바꾸거나 앱 기록를 지우면 함께 사라지니,
+                  가끔 <strong>백업 파일</strong>을 내려받아 드라이브·메일 같은 안전한 곳에 보관해 주세요.
+                </p>
+
+                {/* 저장 공간 사용량 */}
+                <div className="rounded-xl bg-amber-50/60 border border-amber-200/60 p-3">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-amber-900">
+                    <span>저장 공간</span>
+                    <span className="font-mono">
+                      {formatBytes(usedBytes)} / 약 {formatBytes(STORAGE_LIMIT_BYTES)}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 h-1.5 w-full rounded-full bg-amber-200/70 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        usedRatio > 0.8 ? 'bg-red-500' : usedRatio > 0.6 ? 'bg-amber-500' : 'bg-emerald-500'
+                      }`}
+                      style={{ width: `${Math.max(2, Math.round(usedRatio * 100))}%` }}
+                    />
+                  </div>
+                  <p className="mt-1.5 text-[10px] text-amber-700/80 leading-relaxed">
+                    일기 {countEntries(diaries)}편 · 사진 {photoCount}장 저장됨
+                    {usedRatio > 0.8 && ' · 거의 가득 찼습니다. 백업을 받아 두고 오래된 사진을 정리해 주세요.'}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={handleExportBackup}
+                    className="py-2.5 bg-amber-700 hover:bg-amber-800 text-white font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5 shadow transition active:scale-95"
+                  >
+                    <Download size={14} />
+                    <span>백업 내려받기</span>
+                  </button>
+                  <button
+                    onClick={() => importInputRef.current && importInputRef.current.click()}
+                    className="py-2.5 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5 border border-amber-300 transition active:scale-95"
+                  >
+                    <Upload size={14} />
+                    <span>백업 불러오기</span>
+                  </button>
+                </div>
+
+                <input
+                  type="file"
+                  ref={importInputRef}
+                  onChange={handleImportBackup}
+                  accept="application/json,.json"
+                  className="hidden"
+                />
+
+                {backupMessage.text && (
+                  <div className={`p-2 rounded-lg text-[11px] font-semibold leading-relaxed ${
+                    backupMessage.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                  }`}>
+                    {backupMessage.text}
+                  </div>
+                )}
+
+                <p className="text-[10px] text-amber-800/70 leading-relaxed">
+                  내려받은 파일은 폰의 ‘다운로드’ 폴더에 저장됩니다. 불러오면 지금 기록에 날짜별로 합쳐지고,
+                  지금 기록이 지워지지는 않습니다.
+                  {lastBackupAt && ` (마지막 백업: ${new Date(lastBackupAt).toLocaleDateString('ko-KR')})`}
+                </p>
               </div>
 
               {/* 하단 저작권 정보 */}

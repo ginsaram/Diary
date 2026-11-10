@@ -1,32 +1,71 @@
-# React + TypeScript + Vite
+# 하루 성찰 – 나를 안아주는 마음 일기장
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+매일의 하루를 돌아보고 마음을 안아주는, 폰에서 바로 쓰는 성찰 일기장입니다.
+설치 없이 웹 주소만 열면 되고, 일기는 이 기기의 브라우저 안에만 저장됩니다.
 
-Currently, two official plugins are available:
+- 앱 주소: **https://ginsaram.github.io/Diary/**
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 무엇을 할 수 있나요
 
-## React Compiler
+- **하루 성찰 일기** — 날짜를 골라 그날의 하루를 기록합니다. (날짜는 앞뒤로 넘길 수 있습니다)
+- **오늘의 실천 계획** — 팔굽혀 펴기, 책 읽기 같은 계획을 최대 5개까지 기간을 정해 등록하고 매일 체크합니다.
+- **오늘의 사진 기록** — 하루에 2장까지 사진을 붙일 수 있습니다. 폰 사진은 자동으로 크기를 줄여 저장합니다.
+- **글씨 크기 4단계** — 작게 / 기본 / 크게 / 가장 크게.
+- **2자리 비밀번호 잠금** — 일기장을 열 때 비밀번호를 눌러 엽니다. (기본값 `11`, 설정에서 변경)
+- **기록 백업과 복원** — 일기·계획·설정을 JSON 파일 하나로 내려받고, 새 폰에서 그대로 되살립니다.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 폰에서 쓰는 방법
 
-## Expanding the Oxlint configuration
+1. 폰 브라우저에서 https://ginsaram.github.io/Diary/ 를 엽니다.
+2. 홈 화면에 추가하면 앱처럼 전체 화면으로 열립니다.
+   - **안드로이드(Chrome)**: 오른쪽 위 ⋮ → `홈 화면에 추가`
+   - **아이폰(Safari)**: 아래 공유 버튼 → `홈 화면에 추가`
+3. 처음 열면 비밀번호 `11` 을 누르면 들어갑니다. 설정 → 진입 비밀번호 변경에서 꼭 바꿔 주세요.
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+## 일기를 잃지 않으려면 (중요)
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+일기는 **이 기기의 브라우저 저장 공간(localStorage, 약 5MB)** 에만 있습니다.
+그래서 앱을 지우거나, 브라우저 기록·사이트 데이터를 지우거나, 폰을 바꾸면 일기도 함께 사라집니다.
+공간이 가득 차면 새 글이 저장되지 않으므로, 화면에 경고가 뜨면 바로 백업을 받아 주세요.
+
+**백업 받기** — 설정 → 기록 백업과 복원 → `백업 내려받기`
+`haru-seongchal-backup-2026-11-11.json` 같은 파일이 폰의 ‘다운로드’ 폴더에 저장됩니다.
+이 파일을 드라이브나 메일로 보내 두면 폰을 바꿔도 안전합니다.
+
+**되살리기** — 설정 → 기록 백업과 복원 → `백업 불러오기`
+지금 기록에 **합쳐집니다.** 겹치는 날짜는 지금 기록을 그대로 두고, 없는 날짜만 채우므로
+지금 일기가 지워지지는 않습니다.
+
+## 개발
+
+```bash
+npm install
+npm run dev      # 개발 서버
+npm run build    # 배포용 빌드 (dist/)
+npm run preview  # 빌드 결과 확인
+npm run lint     # oxlint
+npm run deploy   # dist/ 를 gh-pages 브랜치로 올려 배포
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+- React 19 + Vite + Tailwind CSS 3
+- 배포: `npm run deploy` 가 `dist/` 를 `gh-pages` 브랜치로 올립니다. GitHub Pages 는 그 브랜치를 바라봅니다.
+  (`main` 브랜치에 올리면 자동 배포되는 GitHub Actions 방식도 쓸 수 있습니다. 저장소 Settings → Pages → Source 를
+  `GitHub Actions` 로 바꾸고 `.github/workflows/deploy.yml` 을 추가하면 됩니다.)
+
+## 폴더
+
+```
+src/App.jsx          일기장 화면 전체 (일기·계획·설정·잠금)
+src/utils/diary.js   날짜 계산, 저장, 백업 파일 만들기/읽기, 사진 줄이기
+src/index.css        Tailwind 진입점 + 기본 스타일
+public/              아이콘, 웹 앱 매니페스트
+scripts/deploy.sh    gh-pages 브랜치로 배포
+```
+
+## 아직 남은 것
+
+- **기기 간 자동 동기화는 없습니다.** 폰과 컴퓨터에서 같은 일기를 보려면 백업 파일로 옮겨야 합니다.
+  (자동 동기화를 넣으려면 로그인과 서버 저장소가 필요합니다.)
+- **AI 배경 이미지 생성**은 API 키가 없어 지금은 동작하지 않습니다. 화면에서 ‘준비 중’으로 안내합니다.
+- **비밀번호는 잠금용 잠금장치일 뿐 암호화가 아닙니다.** 브라우저 저장 공간을 직접 열어 보는 사람에게는
+  일기 내용이 보일 수 있으니, 아주 민감한 내용은 다른 곳에 보관하는 편이 안전합니다.
