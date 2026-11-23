@@ -70,5 +70,5 @@ manifest.webmanifest  홈 화면 추가(PWA)
 sw.js                 오프라인 캐시
 icons/                아이콘
 tools/make_icons.py   아이콘 생성 스크립트
-tools/test_speech.js  목소리 선택·문장 나누기 자동 점검 (node)
+tools/test_speech.js  목소리 선택·문장 나누기 자동 점검 (워크스페이스에만 있는 점검용 스크립트)
 ```
