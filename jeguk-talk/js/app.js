@@ -53,6 +53,15 @@
     bindSettings();
     fillVoices();
 
+    /* 가족용: 주소 끝에 #family 를 붙이면 바로 설정이 열린다 (북마크용) */
+    if (location.hash === '#family' || location.hash === '#설정') {
+      setTimeout(function () {
+        started = true;
+        els.startOverlay.hidden = true;
+        openSheet();
+      }, 300);
+    }
+
     if (!JSpeech.ttsSupported()) {
       setHint('이 브라우저는 목소리 읽기를 지원하지 않아요. 화면 글씨로 이야기할게요.', true);
     }
@@ -422,8 +431,9 @@
     var target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), gh, gm, 0, 0);
     if (S.autoGreet && JStore.getGreetedDate() !== today && now >= target && (now - target) / 60000 <= 150) {
       p = 'morning';
-      JStore.setGreetedDate(today);
     }
+    /* 앱을 열어 인사를 드렸으면 오늘 인사는 마친 것으로 본다 (6시 전에 열었을 때는 6시 인사를 남겨 둔다) */
+    if (now >= target) JStore.setGreetedDate(today);
     greet(p);
   }
 
