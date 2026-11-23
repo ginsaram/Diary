@@ -3,8 +3,8 @@
 연제국 어르신을 위한 스마트폰 음성 말벗 웹앱입니다.
 API 키 없이도 목소리로 말을 걸고, 어르신 말씀을 듣고, 대화를 이어 갑니다.
 
-- 앱 주소: https://ginsaram.github.io/jeguk-talk/
-- 저장소: https://github.com/ginsaram/jeguk-talk
+- 앱 주소: https://ginsaram.github.io/Diary/jeguk-talk/
+- 코드 위치: https://github.com/ginsaram/Diary 의 `gh-pages` 브랜치 `jeguk-talk/` 폴더 (기존 다이어리 앱 파일은 건드리지 않았습니다)
 
 ## 무엇을 하나요
 
