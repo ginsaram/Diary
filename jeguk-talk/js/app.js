@@ -54,13 +54,18 @@
     fillVoices();
 
     /* 가족용: 주소 끝에 #family 를 붙이면 바로 설정이 열린다 (북마크용) */
-    if (location.hash === '#family' || location.hash === '#설정') {
-      setTimeout(function () {
-        started = true;
-        els.startOverlay.hidden = true;
-        openSheet();
-      }, 300);
+    function openFamilySheet() {
+      started = true;
+      els.startOverlay.hidden = true;
+      openSheet();
     }
+    function isFamilyHash() {
+      return location.hash === '#family' || location.hash === '#\uC124\uC815';
+    }
+    if (isFamilyHash()) setTimeout(openFamilySheet, 300);
+    window.addEventListener('hashchange', function () {
+      if (isFamilyHash()) openFamilySheet();
+    });
 
     if (!JSpeech.ttsSupported()) {
       setHint('이 브라우저는 목소리 읽기를 지원하지 않아요. 화면 글씨로 이야기할게요.', true);

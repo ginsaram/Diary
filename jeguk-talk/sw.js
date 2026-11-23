@@ -1,5 +1,5 @@
 /* 오프라인에서도 열리도록 앱 파일을 저장해 둔다 */
-var CACHE = 'jeguk-talk-v2';
+var CACHE = 'jeguk-talk-v3';
 var ASSETS = [
   './',
   'index.html',
