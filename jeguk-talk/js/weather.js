@@ -148,33 +148,110 @@
     return parts.join(' ');
   }
 
-  function geocodeOSM(query) {
-    var url = 'https://nominatim.openstreetmap.org/search?format=json&limit=6&accept-language=ko&addressdetails=1&q=' +
-      encodeURIComponent(query);
+  var ADMIN_TYPES = {
+    city: 1, town: 1, village: 1, municipality: 1, county: 1, province: 1, state: 1,
+    state_district: 1, administrative: 1, suburb: 1, quarter: 1, neighbourhood: 1,
+    borough: 1, district: 1, region: 1
+  };
+
+  function fetchOSM(q, koreaOnly) {
+    var url = 'https://nominatim.openstreetmap.org/search?format=json&limit=8&accept-language=ko' +
+      '&addressdetails=1&namedetails=1&q=' + encodeURIComponent(q) +
+      (koreaOnly ? '&countrycodes=kr' : '');
     return getJSON(url, 8000).then(function (list) {
-      if (!Array.isArray(list) || !list.length) return [];
-      var out = [];
-      var seen = {};
-      for (var i = 0; i < list.length; i++) {
-        var r = list[i];
-        var lat = parseFloat(r.lat);
-        var lon = parseFloat(r.lon);
-        if (isNaN(lat) || isNaN(lon)) continue;
-        var a = r.address || {};
-        var name = shortenAddress(a) || String(r.display_name || '').split(',')[0];
-        var key = name + '|' + Math.round(lat * 100) + '|' + Math.round(lon * 100);
-        if (seen[key]) continue;
-        seen[key] = 1;
-        out.push({ name: name, lat: lat, lon: lon, country: a.country_code || '' });
-      }
-      return out;
+      return Array.isArray(list) ? list : [];
+    }).catch(function () { return []; });
+  }
+
+  function mapOSM(list) {
+    var admin = [];
+    var other = [];
+    var seen = {};
+    for (var i = 0; i < list.length; i++) {
+      var r = list[i];
+      var lat = parseFloat(r.lat);
+      var lon = parseFloat(r.lon);
+      if (isNaN(lat) || isNaN(lon)) continue;
+      var a = r.address || {};
+      var nd = r.namedetails || {};
+      var localName = nd['name:ko'] || nd.name || r.name || '';
+      var city = a.city || a.town || a.county || a.province || '';
+      var label = localName || shortenAddress(a) || String(r.display_name || '').split(',')[0];
+      if (!label) continue;
+      var isAdmin = !!ADMIN_TYPES[r.type];
+      if (city && city !== label && label.indexOf(city) < 0) label = label + ' ' + city;
+      var key = label + '|' + Math.round(lat * 100) + '|' + Math.round(lon * 100);
+      if (seen[key]) continue;
+      seen[key] = 1;
+      var item = { name: label, lat: lat, lon: lon, country: a.country_code || '', admin: isAdmin };
+      if (isAdmin) admin.push(item);
+      else other.push(item);
+    }
+    return admin.concat(other);
+  }
+
+  function delay(ms) {
+    return new Promise(function (res) { setTimeout(res, ms); });
+  }
+
+  function hasAdmin(list) {
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].admin) return true;
+    }
+    return false;
+  }
+
+  /* 행정 지명을 앞으로, 같은 곳은 한 번만 */
+  function orderAdmin(list) {
+    var a = [];
+    var o = [];
+    var seen = {};
+    for (var i = 0; i < list.length; i++) {
+      var x = list[i];
+      var key = x.name + '|' + Math.round(x.lat * 100) + '|' + Math.round(x.lon * 100);
+      if (seen[key]) continue;
+      seen[key] = 1;
+      if (x.admin) a.push(x); else o.push(x);
+    }
+    return a.concat(o);
+  }
+
+  function stripAdmin(list) {
+    return list.map(function (x) {
+      return { name: x.name, lat: x.lat, lon: x.lon, country: x.country };
     });
   }
 
+  /* 한국 지명은 OpenStreetMap(Nominatim) 쪽이 훨씬 정확하다.
+     '배방'처럼 짧게 치면 역·가게가 먼저 나오므로, 행정 지명(읍·면·시)으로 한 번 더 찾아본다. */
   function geocode(query) {
-    return geocodeOSM(query).catch(function () { return []; }).then(function (list) {
-      if (list && list.length) return list;
-      return geocodeOpenMeteo(query).catch(function () { return []; });
+    var q = String(query || '').trim();
+    if (!q) return Promise.resolve([]);
+    var korean = /[\uAC00-\uD7A3]/.test(q);
+    var suffixed = /(\uC74D|\uBA74|\uB3D9|\uC2DC|\uAD70|\uAD6C|\uB9AC|\uC74C|\uBA74)$/.test(q);
+    var tries = korean && !suffixed && q.length <= 5 ? (q.length <= 2 ? ['시', '읍'] : ['읍', '면']) : [];
+
+    function next(i, collected) {
+      if (i > tries.length - 1) {
+        return Promise.resolve(stripAdmin(orderAdmin(collected)));
+      }
+      return fetchOSM(q + tries[i], korean).then(function (raw) {
+        var mapped = mapOSM(raw);
+        var merged = collected.concat(mapped);
+        if (hasAdmin(merged)) return stripAdmin(orderAdmin(merged));
+        return delay(1100).then(function () { return next(i + 1, merged); });
+      });
+    }
+
+    return fetchOSM(q, korean).then(function (raw) {
+      var first = mapOSM(raw);
+      if (hasAdmin(first) || !tries.length) return stripAdmin(orderAdmin(first));
+      return delay(1100).then(function () { return next(0, first); });
+    }).then(function (list) {
+      if (list && list.length) return list.slice(0, 6);
+      return geocodeOpenMeteo(q).catch(function () { return []; });
+    }).catch(function () {
+      return geocodeOpenMeteo(q).catch(function () { return []; });
     });
   }
 
