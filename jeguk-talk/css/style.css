@@ -16,7 +16,7 @@
 }
 
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;margin:0}
+html,body{height:100%;margin:0;overflow:hidden}
 body{
   font-family:"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic","맑은 고딕",system-ui,-apple-system,sans-serif;
   color:var(--ink);
@@ -30,8 +30,9 @@ body{
 .app{
   display:flex;
   flex-direction:column;
-  min-height:100dvh;
-  min-height:100vh;
+  height:100vh;
+  height:100dvh;
+  overflow:hidden;
   padding:calc(10px + env(safe-area-inset-top)) 16px calc(12px + env(safe-area-inset-bottom));
   max-width:560px;
   margin:0 auto;
@@ -97,6 +98,7 @@ body{
 .stage{
   flex:1 1 auto;
   min-height:0;
+  overflow:hidden;
   display:flex;
   flex-direction:column;
   align-items:center;
@@ -183,6 +185,7 @@ body{
   color:#37271b;
   max-height:34vh;
   overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
   padding:0 4px;
   word-break:keep-all;
   flex:0 1 auto;
@@ -405,10 +408,19 @@ body{
 }
 .toast[hidden]{display:none}
 
+@media (max-height:700px){
+  .buddy{width:96px;height:96px}
+  .caption{font-size:clamp(20px,5.4vw,26px);max-height:30vh}
+  .chip{min-height:52px;font-size:19px}
+  .bigbtn.mic{min-height:76px}
+  .bigbtn.talk{min-height:60px}
+  .periodrow .period{min-height:38px;font-size:14px}
+}
+
 @media (max-height:640px){
-  .buddy{width:92px;height:92px}
-  .periodrow{display:none}
+  .buddy{width:84px;height:84px}
   .caption{max-height:26vh}
+  .hint{font-size:14px}
 }
 @media (prefers-reduced-motion:reduce){
   .buddy,.overlay-face,.spark{animation:none}

@@ -1,6 +1,6 @@
 /* 오프라인에서도 열리도록 앱 파일을 저장해 둡니다.
    인터넷이 되면 항상 새 파일을 먼저 받아 오고, 안 되면 저장해 둔 파일을 씁니다. */
-var CACHE = 'jeguk-talk-v6';
+var CACHE = 'jeguk-talk-v7';
 var ASSETS = [
   './',
   'index.html',
