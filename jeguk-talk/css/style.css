@@ -429,3 +429,11 @@ body{
 /* 지역 빠른 선택 */
 .results.quick{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 .results.quick button{font-size:15px;font-weight:800;text-align:center;padding:10px 8px;background:#fff8ee;color:#6b4d2e}
+
+/* 목소리 목록 · 미리 듣기 (가족 설정) */
+.grp h3.sub{margin-top:18px;border-top:1px dashed #e6d8c6;padding-top:14px}
+.vdiag{margin:8px 0 2px;padding:10px 12px;background:#fff8ee;border-radius:12px;color:#6b4d2e;font-size:14px;line-height:1.5}
+.vdiag:empty{display:none}
+.vdiag .vdhead{font-weight:800;color:#8a5a3a;margin-bottom:4px;font-size:13px}
+.vdiag .vdline{word-break:keep-all}
+.vdiag .vmeta{color:#a08a72;font-size:12px}

@@ -12,7 +12,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
-<link rel="stylesheet" href="css/style.css?v=8">
+<link rel="stylesheet" href="css/style.css?v=9">
 <script>
   /* 오류 점검용 (화면에는 보이지 않음) */
   window.__errs = [];
@@ -136,16 +136,20 @@
     <section class="grp">
       <h3>목소리</h3>
       <label class="field">
-        <span>말하기 속도 <b id="rateVal">0.85</b></span>
-        <input type="range" id="setRate" min="0.6" max="1.2" step="0.05" value="0.85">
+        <span>말하기 속도 <b id="rateVal">0.92</b></span>
+        <input type="range" id="setRate" min="0.6" max="1.2" step="0.05" value="0.92">
       </label>
       <label class="field">
         <span>목소리</span>
-        <select id="setVoice"><option value="">기본 목소리</option></select>
+        <select id="setVoice"><option value="">자동 (가장 자연스러운 목소리)</option></select>
       </label>
       <div class="btnrow">
-        <button class="sbtn" type="button" id="testVoice">이 목소리로 들어보기</button>
+        <button class="sbtn" type="button" id="testVoice">이 목소리 들어보기</button>
+        <button class="sbtn" type="button" id="auditionAll">목소리 차례로 듣기</button>
       </div>
+      <p class="note" id="voiceAutoNote"></p>
+      <div class="vdiag" id="voiceDiag"></div>
+      <p class="note">휴대폰에 한국어 목소리가 여러 개 있으면 인터넷 목소리(Google·Microsoft)를 먼저 골라 씁니다. 인터넷이 끊기면 휴대폰 목소리로 이어서 말해요.</p>
     </section>
 
     <section class="grp">
@@ -214,6 +218,25 @@
         <button class="sbtn" type="button" id="apiTest">연결 확인</button>
       </div>
       <p class="note" id="apiStatus"></p>
+
+      <h3 class="sub">자연스러운 목소리 (OpenAI · 선택)</h3>
+      <p class="note" id="ttsNote"></p>
+      <label class="field">
+        <span>목소리 방식</span>
+        <select id="setTtsEngine">
+          <option value="browser">휴대폰 목소리 (기본 · 무료)</option>
+          <option value="openai">OpenAI 목소리 (더 자연스러움 · 유료)</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>OpenAI 목소리</span>
+        <select id="setTtsVoice">
+          <option value="nova">nova (다정한 여성)</option>
+          <option value="onyx">onyx (차분한 남성)</option>
+          <option value="shimmer">shimmer (밝은 여성)</option>
+          <option value="alloy">alloy (중성)</option>
+        </select>
+      </label>
     </details>
 
     <section class="grp">
@@ -232,10 +255,10 @@
 
 <div class="toast" id="toast" hidden></div>
 
-<script src="js/storage.js?v=8"></script>
-<script src="js/weather.js?v=8"></script>
-<script src="js/speech.js?v=8"></script>
-<script src="js/engine.js?v=8"></script>
-<script src="js/app.js?v=8"></script>
+<script src="js/storage.js?v=9"></script>
+<script src="js/weather.js?v=9"></script>
+<script src="js/speech.js?v=9"></script>
+<script src="js/engine.js?v=9"></script>
+<script src="js/app.js?v=9"></script>
 </body>
 </html>

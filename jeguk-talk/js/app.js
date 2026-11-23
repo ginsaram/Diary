@@ -95,7 +95,12 @@
           settings: S,
           listening: !!listening,
           lastSpoken: lastSpoken,
-          engineTopics: engine.topics
+          engineTopics: engine.topics,
+          voice: (function () {
+            var p = JSpeech.pickVoices(S.voiceURI).primary;
+            return p ? { name: p.name, local: !!p.localService, uri: p.voiceURI } : null;
+          })(),
+          ttsEngine: aiTtsEnabled() ? 'openai:' + (S.ttsVoice || 'nova') : 'browser'
         };
       },
       engine: engine,
@@ -175,6 +180,23 @@
 
   var speakSeq = 0;
 
+  function speakLocal(text) {
+    return JSpeech.speak(text, {
+      rate: S.rate,
+      pitch: S.pitch,
+      voiceURI: S.voiceURI
+    });
+  }
+
+  function isSpeakingNow() {
+    return JSpeech.isSpeaking() || !!aiAudio;
+  }
+
+  function stopVoice() {
+    stopAiAudio();
+    JSpeech.stop();
+  }
+
   function speakText(text, opts) {
     opts = opts || {};
     speakSeq++;
@@ -186,11 +208,18 @@
     els.buddy.classList.remove('listening');
     setHint('');
 
-    return JSpeech.speak(text, {
-      rate: S.rate,
-      pitch: S.pitch,
-      voiceURI: S.voiceURI
-    }).then(function (r) {
+    var work;
+    if (aiTtsEnabled()) {
+      work = aiSpeak(text).then(function (r) {
+        if (r.ok || mySeq !== speakSeq) return r;
+        /* 키·인터넷 문제면 휴대폰 목소리로 이어서 읽는다 */
+        return speakLocal(text);
+      });
+    } else {
+      work = speakLocal(text);
+    }
+
+    return work.then(function (r) {
       if (mySeq !== speakSeq) return r;
       els.buddy.classList.remove('speaking');
       if (!r.ok && r.reason === 'unsupported') {
@@ -201,6 +230,78 @@
     });
   }
 
+  /* ---------- OpenAI 목소리 (선택 · 키가 있을 때만) ---------- */
+  var aiAudio = null;
+  var aiAudioUrl = '';
+  var aiStop = null;
+
+  function aiTtsEnabled() {
+    if (S.ttsEngine !== 'openai') return false;
+    if (!S.apiKey) return false;
+    return S.provider === 'openai' || /^sk-/.test(S.apiKey);
+  }
+
+  function stopAiAudio() {
+    if (aiStop) {
+      try { aiStop(); } catch (e) {}
+      aiStop = null;
+    }
+    if (aiAudio) {
+      try { aiAudio.pause(); } catch (e) {}
+      aiAudio = null;
+    }
+    if (aiAudioUrl) {
+      try { URL.revokeObjectURL(aiAudioUrl); } catch (e) {}
+      aiAudioUrl = '';
+    }
+  }
+
+  function aiSpeak(text) {
+    return new Promise(function (resolve) {
+      var plain = JSpeech.splitText(text).join(' ');
+      var body = {
+        model: 'tts-1',
+        voice: S.ttsVoice || 'nova',
+        input: plain.slice(0, 900) || ' ',
+        response_format: 'mp3',
+        speed: Math.max(0.5, Math.min(1.5, Number(S.rate) || 0.92))
+      };
+      fetch('https://api.openai.com/v1/audio/speech', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + S.apiKey
+        },
+        body: JSON.stringify(body)
+      }).then(function (res) {
+        if (!res.ok) throw new Error('TTS HTTP ' + res.status);
+        return res.blob();
+      }).then(function (blob) {
+        var url = URL.createObjectURL(blob);
+        var a = new Audio();
+        aiAudio = a;
+        aiAudioUrl = url;
+        var settled = false;
+        function finish(ok, reason) {
+          if (settled) return;
+          settled = true;
+          if (aiStop === stopper) aiStop = null;
+          if (aiAudio === a) aiAudio = null;
+          try { URL.revokeObjectURL(url); } catch (e) {}
+          if (aiAudioUrl === url) aiAudioUrl = '';
+          resolve({ ok: ok, reason: reason, voice: 'openai:' + (S.ttsVoice || 'nova') });
+        }
+        var stopper = function () { finish(false, 'cancelled'); };
+        aiStop = stopper;
+        a.onended = function () { finish(true, 'end'); };
+        a.onerror = function () { finish(false, 'audio-error'); };
+        a.src = url;
+        var p = a.play();
+        if (p && p.catch) p.catch(function () { finish(false, 'play-blocked'); });
+      }).catch(function () { resolve({ ok: false, reason: 'tts-failed' }); });
+    }).catch(function () { return { ok: false, reason: 'tts-failed' }; });
+  }
+
   /* ---------- 듣기 ---------- */
   function startListening() {
     if (listening) { stopListening(true); return; }
@@ -208,7 +309,7 @@
       setHint('이 휴대폰에서는 마이크 듣기가 안 돼요. 아래 버튼으로 대답해 주세요.', true);
       return;
     }
-    JSpeech.stop();
+    stopVoice();
     clearTimeout(speakTimer);
     els.buddy.classList.remove('speaking');
     els.buddy.classList.add('listening');
@@ -331,7 +432,7 @@
     if (!JSpeech.sttSupported()) return;
     if (document.hidden) return;
     speakTimer = setTimeout(function () {
-      if (!JSpeech.isSpeaking()) startListening();
+      if (!isSpeakingNow()) startListening();
     }, 700);
   }
 
@@ -451,7 +552,7 @@
 
     els.micBtn.addEventListener('click', function () {
       if (!started) { startSession(); return; }
-      if (JSpeech.isSpeaking()) JSpeech.stop();
+      if (isSpeakingNow()) stopVoice();
       startListening();
     });
 
@@ -467,7 +568,7 @@
       var btn = ev.target.closest ? ev.target.closest('[data-period]') : null;
       if (!btn) return;
       if (!started) { startSession(); return; }
-      JSpeech.stop();
+      stopVoice();
       greet(btn.getAttribute('data-period'));
     });
 
@@ -508,7 +609,7 @@
 
   /* ---------- 설정 ---------- */
   function openSheet() {
-    JSpeech.stop();
+    stopVoice();
     els.buddy.classList.remove('speaking');
     fillSettingsForm();
     els.sheet.hidden = false;
@@ -540,8 +641,25 @@
     $('setModel').value = S.model || '';
     $('locNow').textContent = '지역: ' + (S.locName || '설정 안 됨') + ' (' + Number(S.lat).toFixed(3) + ', ' + Number(S.lon).toFixed(3) + ')';
     $('locResults').innerHTML = '';
+    var eng = $('setTtsEngine');
+    if (eng) eng.value = S.ttsEngine === 'openai' ? 'openai' : 'browser';
+    var tv = $('setTtsVoice');
+    if (tv) tv.value = S.ttsVoice || 'nova';
+    updateTtsNote();
     fillVoices();
     updateSwNote();
+  }
+
+  function updateTtsNote() {
+    var el = $('ttsNote');
+    if (!el) return;
+    if (aiTtsEnabled()) {
+      el.textContent = '지금은 OpenAI 목소리(' + (S.ttsVoice || 'nova') + ')로 읽습니다. 인터넷이나 키에 문제가 생기면 자동으로 휴대폰 목소리로 돌아갑니다.';
+    } else if (S.ttsEngine === 'openai') {
+      el.textContent = 'OpenAI 키가 아직 없어서 지금은 휴대폰 목소리로 읽습니다. 위에 키를 넣으면 OpenAI 목소리를 씁니다.';
+    } else {
+      el.textContent = '지금은 위에서 고른 휴대폰 목소리로 읽습니다. OpenAI 키를 넣고 방식을 바꾸면 더 자연스러운 목소리로 읽어 줄 수 있어요.';
+    }
   }
 
   function updateSwNote() {
@@ -561,16 +679,101 @@
   function fillVoices() {
     var sel = $('setVoice');
     if (!sel) return;
+    JSpeech.refreshVoices();
     var list = JSpeech.koreanVoices();
     var current = S.voiceURI || '';
-    var html = '<option value="">기본 목소리</option>';
+    var auto = JSpeech.pickVoices('');
+    var autoVoice = auto.primary;
+    var html = '<option value="">자동 (가장 자연스러운 목소리)</option>';
     for (var i = 0; i < list.length; i++) {
       var v = list[i];
-      var label = v.name + (v.localService ? '' : ' (인터넷 목소리)');
+      var label = v.name;
+      if (v.localService === false) label += ' (인터넷 목소리)';
+      if (autoVoice && v.voiceURI === autoVoice.voiceURI) label = '⭐ ' + label;
       html += '<option value="' + escapeAttr(v.voiceURI) + '">' + escapeHtml(label) + '</option>';
     }
     sel.innerHTML = html;
     sel.value = current;
+    if (sel.value !== current) sel.value = '';
+
+    var note = $('voiceAutoNote');
+    if (note) {
+      if (!list.length) {
+        note.textContent = '이 휴대폰에서 한국어 목소리를 찾지 못했어요. 휴대폰 설정에서 Google 음성 합성의 한국어 음성을 설치하면 목소리가 좋아져요.';
+      } else if (autoVoice) {
+        note.textContent = '자동으로 고른 목소리: ' + autoVoice.name +
+          (autoVoice.localService === false ? ' (인터넷 목소리 · 가장 자연스러움)' : ' (휴대폰 목소리)');
+      } else {
+        note.textContent = '';
+      }
+    }
+    renderVoiceDiag();
+  }
+
+  function renderVoiceDiag() {
+    var box = $('voiceDiag');
+    if (!box) return;
+    var list = JSpeech.rankedVoices();
+    if (!list.length) { box.innerHTML = ''; return; }
+    var auto = JSpeech.pickVoices('');
+    var html = '<div class="vdhead">이 휴대폰의 한국어 목소리 ' + list.length + '개</div>';
+    for (var i = 0; i < list.length && i < 8; i++) {
+      var v = list[i].voice;
+      var star = (auto.primary && v.voiceURI === auto.primary.voiceURI) ? '⭐ ' : '· ';
+      html += '<div class="vdline">' + star + escapeHtml(v.name) +
+        ' <span class="vmeta">(' + (v.localService ? '휴대폰' : '인터넷') + ')</span></div>';
+    }
+    box.innerHTML = html;
+  }
+
+  /* 목소리 미리 듣기: 저장하지 않고 지금 고른 목소리로 한 마디 */
+  var audSeq = 0;
+
+  function audition(text, uri) {
+    audSeq++;
+    var my = audSeq;
+    stopVoice();
+    speakSeq++;
+    els.buddy.classList.add('speaking');
+    return JSpeech.speak(text, {
+      rate: S.rate,
+      pitch: S.pitch,
+      voiceURI: uri || ''
+    }).then(function (r) {
+      if (my === audSeq) els.buddy.classList.remove('speaking');
+      return r;
+    });
+  }
+
+  /* 이 휴대폰에 있는 한국어 목소리를 하나씩 들려준다 */
+  function auditionAll() {
+    var list = JSpeech.koreanVoices();
+    if (!list.length) {
+      toast('이 휴대폰에서 한국어 목소리를 찾지 못했어요.');
+      return;
+    }
+    audSeq++;
+    var my = audSeq;
+    stopVoice();
+    var i = 0;
+
+    function step() {
+      if (my !== audSeq || i >= list.length) {
+        els.buddy.classList.remove('speaking');
+        return;
+      }
+      var v = list[i++];
+      els.buddy.classList.add('speaking');
+      JSpeech.speak('이 목소리는 ' + v.name + ' 입니다. ' + S.name + ', 오늘 하루 어떠셨는가?', {
+        rate: S.rate,
+        pitch: S.pitch,
+        voiceURI: v.voiceURI
+      }).then(function () {
+        if (my !== audSeq) return;
+        setTimeout(step, 400);
+      });
+    }
+    step();
   }
 
   function escapeHtml(s) {
@@ -645,7 +848,7 @@
     });
 
     $('setRate').addEventListener('input', function () {
-      S.rate = parseFloat(this.value) || 0.85;
+      S.rate = parseFloat(this.value) || JSpeech.DEFAULT_RATE;
       $('rateVal').textContent = Number(S.rate).toFixed(2);
       save();
     });
@@ -653,11 +856,39 @@
     $('setVoice').addEventListener('change', function () {
       S.voiceURI = this.value || '';
       save();
+      /* 고른 목소리를 바로 들려준다 */
+      audition(S.name + ', 나는 말벗 다림이여. 오늘 하루도 편안하게 지내셔유.', S.voiceURI);
     });
 
     $('testVoice').addEventListener('click', function () {
-      speakText(S.name + ', 나는 말벗 다림이여. 오늘 하루도 편안하게 지내셔유.', {});
+      var sel = $('setVoice');
+      var uri = sel ? (sel.value || '') : (S.voiceURI || '');
+      audition(S.name + ', 나는 말벗 다림이여. 오늘 하루도 편안하게 지내셔유.', uri);
     });
+
+    var cycleBtn = $('auditionAll');
+    if (cycleBtn) cycleBtn.addEventListener('click', auditionAll);
+
+    var engSel = $('setTtsEngine');
+    if (engSel) {
+      engSel.addEventListener('change', function () {
+        S.ttsEngine = this.value === 'openai' ? 'openai' : 'browser';
+        save();
+        updateTtsNote();
+        if (S.ttsEngine === 'openai' && !aiTtsEnabled()) {
+          toast('OpenAI 키가 아직 없어서 지금은 휴대폰 목소리로 읽어요.');
+        }
+      });
+    }
+
+    var ttsVoiceSel = $('setTtsVoice');
+    if (ttsVoiceSel) {
+      ttsVoiceSel.addEventListener('change', function () {
+        S.ttsVoice = this.value || 'nova';
+        save();
+        audition(S.name + ', 나는 말벗 다림이여. 오늘 하루도 편안하게 지내셔유.');
+      });
+    }
 
     $('testMorning').addEventListener('click', function () {
       els.sheet.hidden = true;
@@ -741,6 +972,7 @@
     $('setApiKey').addEventListener('change', function () {
       S.apiKey = this.value.trim();
       save();
+      updateTtsNote();
       toast(S.apiKey ? 'API 키를 저장했어요. (이 휴대폰에만)' : 'API 키를 지웠어요.');
     });
     $('setModel').addEventListener('change', function () {

@@ -8,12 +8,16 @@
   var K_WEATHER = 'jeguk.weather.v1';
   var HISTORY_MAX = 1500;
 
+  /* 설정 판(버전): 2부터 목소리 기본값이 자연스러운 쪽으로 바뀌었다 */
+  var SCHEMA = 2;
+
   var DEFAULTS = {
+    schema: SCHEMA,
     name: '제국아',
     autoGreet: true,
     greetTime: '06:00',
-    rate: 0.85,
-    pitch: 1.0,
+    rate: 0.92,
+    pitch: 1.02,
     voiceURI: '',
     autoListen: true,
     wakeLock: true,
@@ -22,7 +26,9 @@
     locName: '충남 아산시 배방읍',
     provider: 'none',
     apiKey: '',
-    model: ''
+    model: '',
+    ttsEngine: 'browser',
+    ttsVoice: 'nova'
   };
 
   function readJSON(key, fallback) {
@@ -56,6 +62,15 @@
       for (k in saved) {
         if (Object.prototype.hasOwnProperty.call(saved, k)) out[k] = saved[k];
       }
+    }
+
+    /* 예전 기본값(0.85, 피치 1.0)이 그대로 남아 있으면 새 기본값으로 옮긴다.
+       가족이 직접 바꿔 둔 값은 건드리지 않는다. */
+    if (!saved || Number(saved.schema || 0) < SCHEMA) {
+      if (Number(out.rate) === 0.85) out.rate = DEFAULTS.rate;
+      if (Number(out.pitch) === 1) out.pitch = DEFAULTS.pitch;
+      out.schema = SCHEMA;
+      writeJSON(K_SETTINGS, out);
     }
     return out;
   }
@@ -137,6 +152,7 @@
 
   global.JStore = {
     DEFAULTS: DEFAULTS,
+    SCHEMA: SCHEMA,
     getSettings: getSettings,
     saveSettings: saveSettings,
     todayKey: todayKey,
