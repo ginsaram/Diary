@@ -519,6 +519,12 @@
   function closeSheet() {
     els.sheet.hidden = true;
     if (!started) els.startOverlay.hidden = false;
+    /* #family 로 열었을 때는 주소에서 빼 두어, 다시 열어도 설정이 먼저 뜨지 않게 */
+    if (location.hash === '#family' || location.hash === '#\uC124\uC815') {
+      try {
+        history.replaceState(null, '', location.pathname + location.search);
+      } catch (e) {}
+    }
   }
 
   function fillSettingsForm() {
