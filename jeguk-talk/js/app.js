@@ -677,6 +677,15 @@
       if (ev.key === 'Enter') { ev.preventDefault(); doLocSearch(); }
     });
 
+    function pickFromList(ev) {
+      var btn = ev.target.closest ? ev.target.closest('button[data-lat]') : null;
+      if (!btn) return;
+      setLocation(parseFloat(btn.getAttribute('data-lat')), parseFloat(btn.getAttribute('data-lon')), btn.getAttribute('data-name'));
+      toast(btn.getAttribute('data-name') + ' 으로 설정했어요.');
+    }
+    $('locQuick').addEventListener('click', pickFromList);
+    $('locResults').addEventListener('click', pickFromList);
+
     $('locGps').addEventListener('click', function () {
       if (!navigator.geolocation) { toast('이 휴대폰은 위치를 알려주지 못해요.'); return; }
       toast('위치를 찾는 중…');
@@ -766,13 +775,6 @@
     }).catch(function () {
       box.innerHTML = '<p class="note">지역을 찾지 못했어요. 인터넷을 확인해 주세요.</p>';
     });
-
-    box.onclick = function (ev) {
-      var btn = ev.target.closest ? ev.target.closest('button[data-lat]') : null;
-      if (!btn) return;
-      setLocation(parseFloat(btn.getAttribute('data-lat')), parseFloat(btn.getAttribute('data-lon')), btn.getAttribute('data-name'));
-      toast(btn.getAttribute('data-name') + ' 으로 설정했어요.');
-    };
   }
 
   function setLocation(lat, lon, name) {

@@ -116,7 +116,7 @@
     });
   }
 
-  function geocode(query) {
+  function geocodeOpenMeteo(query) {
     var url = 'https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(query) +
       '&count=6&language=ko&format=json';
     return getJSON(url, 8000).then(function (d) {
@@ -133,6 +133,48 @@
           country: r.country || ''
         };
       });
+    });
+  }
+
+  /* 한국 지명은 OpenStreetMap(Nominatim) 쪽이 훨씬 정확하다 */
+  function shortenAddress(a) {
+    var parts = [];
+    var local = a.village || a.hamlet || a.town || a.suburb || a.quarter || a.neighbourhood || a.city_district;
+    if (local) parts.push(local);
+    if (a.city && parts.indexOf(a.city) < 0) parts.push(a.city);
+    if (!parts.length && a.county) parts.push(a.county);
+    if (!parts.length && a.province) parts.push(a.province);
+    if (!parts.length && a.state) parts.push(a.state);
+    return parts.join(' ');
+  }
+
+  function geocodeOSM(query) {
+    var url = 'https://nominatim.openstreetmap.org/search?format=json&limit=6&accept-language=ko&addressdetails=1&q=' +
+      encodeURIComponent(query);
+    return getJSON(url, 8000).then(function (list) {
+      if (!Array.isArray(list) || !list.length) return [];
+      var out = [];
+      var seen = {};
+      for (var i = 0; i < list.length; i++) {
+        var r = list[i];
+        var lat = parseFloat(r.lat);
+        var lon = parseFloat(r.lon);
+        if (isNaN(lat) || isNaN(lon)) continue;
+        var a = r.address || {};
+        var name = shortenAddress(a) || String(r.display_name || '').split(',')[0];
+        var key = name + '|' + Math.round(lat * 100) + '|' + Math.round(lon * 100);
+        if (seen[key]) continue;
+        seen[key] = 1;
+        out.push({ name: name, lat: lat, lon: lon, country: a.country_code || '' });
+      }
+      return out;
+    });
+  }
+
+  function geocode(query) {
+    return geocodeOSM(query).catch(function () { return []; }).then(function (list) {
+      if (list && list.length) return list;
+      return geocodeOpenMeteo(query).catch(function () { return []; });
     });
   }
 

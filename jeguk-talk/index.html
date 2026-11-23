@@ -12,7 +12,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
-<link rel="stylesheet" href="css/style.css?v=4">
+<link rel="stylesheet" href="css/style.css?v=5">
 <script>
   /* 오류 점검용 (화면에는 보이지 않음) */
   window.__errs = [];
@@ -168,6 +168,12 @@
         <input type="text" id="locQuery" placeholder="동네 이름 (예: 아산, 배방, 유구)" autocomplete="off">
         <button class="sbtn" type="button" id="locSearchBtn">찾기</button>
       </div>
+      <div class="results quick" id="locQuick">
+        <button type="button" data-lat="36.7656" data-lon="127.0663" data-name="배방읍 아산시">배방(아산)</button>
+        <button type="button" data-lat="36.7899" data-lon="127.0027" data-name="아산시">아산</button>
+        <button type="button" data-lat="36.5853" data-lon="126.9689" data-name="유구읍 공주시">유구(공주)</button>
+        <button type="button" data-lat="36.8150" data-lon="127.1141" data-name="천안시">천안</button>
+      </div>
       <div class="results" id="locResults"></div>
       <div class="btnrow">
         <button class="sbtn" type="button" id="locGps">이 휴대폰 위치로</button>
@@ -226,10 +232,10 @@
 
 <div class="toast" id="toast" hidden></div>
 
-<script src="js/storage.js?v=4"></script>
-<script src="js/weather.js?v=4"></script>
-<script src="js/speech.js?v=4"></script>
-<script src="js/engine.js?v=4"></script>
-<script src="js/app.js?v=4"></script>
+<script src="js/storage.js?v=5"></script>
+<script src="js/weather.js?v=5"></script>
+<script src="js/speech.js?v=5"></script>
+<script src="js/engine.js?v=5"></script>
+<script src="js/app.js?v=5"></script>
 </body>
 </html>

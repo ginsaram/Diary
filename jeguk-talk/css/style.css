@@ -413,3 +413,7 @@ body{
 @media (prefers-reduced-motion:reduce){
   .buddy,.overlay-face,.spark{animation:none}
 }
+
+/* 지역 빠른 선택 */
+.results.quick{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.results.quick button{font-size:15px;font-weight:800;text-align:center;padding:10px 8px;background:#fff8ee;color:#6b4d2e}
