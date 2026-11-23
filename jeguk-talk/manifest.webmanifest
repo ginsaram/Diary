@@ -1,0 +1,19 @@
+{
+  "name": "제국아 말벗",
+  "short_name": "제국아 말벗",
+  "description": "제국 어르신을 위한 목소리 말벗 — 날씨와 시간에 맞춰 다정하게 말을 걸어 드려요.",
+  "lang": "ko",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fff3e2",
+  "theme_color": "#fff3e2",
+  "categories": ["health", "lifestyle"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

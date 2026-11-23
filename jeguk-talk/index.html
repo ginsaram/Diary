@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>제국아 말벗</title>
+<meta name="description" content="제국 어르신을 위한 목소리 말벗">
+<meta name="theme-color" content="#fff3e2">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="제국아 말벗">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/style.css">
+<script>
+  /* 오류 점검용 (화면에는 보이지 않음) */
+  window.__errs = [];
+  window.addEventListener('error', function (e) {
+    try { window.__errs.push(String((e && e.message) || (e && e.error) || 'error')); } catch (x) {}
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    try { window.__errs.push('rejection: ' + String((e && e.reason) || '')); } catch (x) {}
+  });
+</script>
+</head>
+<body>
+
+<div class="app" id="app">
+
+  <header class="topbar">
+    <div class="clockbox">
+      <div class="clock" id="clock">--:--</div>
+      <div class="dateline" id="dateLine">&nbsp;</div>
+    </div>
+    <div class="weatherchip" id="weatherChip" title="오늘 날씨">
+      <span class="wemoji" id="weatherEmoji">🌤</span>
+      <span class="wtemp" id="weatherTemp">--°</span>
+      <span class="wdesc" id="weatherDesc">날씨 확인 중</span>
+    </div>
+    <button class="gear" id="gearBtn" aria-label="가족 설정 (길게 누르기)">⚙</button>
+  </header>
+
+  <main class="stage">
+    <div class="buddy" id="buddy" aria-hidden="true">
+      <span class="spark s1"></span>
+      <span class="spark s2"></span>
+      <span class="spark s3"></span>
+      <div class="face">
+        <div class="eye left"></div>
+        <div class="eye right"></div>
+        <div class="cheek cl"></div>
+        <div class="cheek cr"></div>
+        <div class="mouth" id="mouth"></div>
+      </div>
+      <div class="nametag">말벗 다림이</div>
+    </div>
+
+    <p class="caption" id="caption" aria-live="polite">제국아, 오늘 하루 어떠셨는가?</p>
+    <p class="hint" id="hint"></p>
+  </main>
+
+  <section class="controls" aria-label="대화 버튼">
+    <div class="quickrow" id="quickRow">
+      <button class="chip" type="button" data-say="좋지">좋지</button>
+      <button class="chip" type="button" data-say="피곤혀">피곤혀</button>
+      <button class="chip" type="button" data-say="산책 가자">산책 가자</button>
+      <button class="chip" type="button" data-say="다시 말해줘">다시 말해줘</button>
+    </div>
+
+    <button class="bigbtn mic" id="micBtn" type="button">
+      <span class="ico">🎤</span>
+      <span class="lbl">눌러서 대답하기</span>
+    </button>
+    <button class="bigbtn talk" id="talkBtn" type="button">
+      <span class="ico">💬</span>
+      <span class="lbl">말 걸어줘</span>
+    </button>
+
+    <div class="periodrow" id="periodRow" aria-label="시간대별 인사">
+      <button class="period" type="button" data-period="morning">아침</button>
+      <button class="period" type="button" data-period="noon">점심</button>
+      <button class="period" type="button" data-period="afternoon">오후</button>
+      <button class="period" type="button" data-period="evening">저녁</button>
+    </div>
+  </section>
+</div>
+
+<!-- 시작 화면: 소리 잠금 해제 + 마이크 권한 -->
+<div class="overlay" id="startOverlay">
+  <div class="overlay-card">
+    <div class="overlay-face" aria-hidden="true">
+      <span class="oe"></span><span class="oe"></span><span class="om"></span>
+    </div>
+    <h1>제국아 말벗</h1>
+    <p class="ov-lead">버튼 한 번만 눌러 주시면<br>오늘 이야기를 시작할게요.</p>
+    <button class="startbtn" id="startBtn" type="button">시작하기</button>
+    <p class="tiny">충전기에 꽂아 두시면<br>아침 인사를 먼저 드려요.</p>
+  </div>
+</div>
+
+<!-- 가족 설정 -->
+<div class="sheet" id="sheet" hidden>
+  <div class="sheet-head">
+    <h2>가족 설정</h2>
+    <button class="sheet-close" id="sheetClose" type="button">닫기</button>
+  </div>
+
+  <div class="sheet-body">
+
+    <section class="grp">
+      <h3>부르는 이름</h3>
+      <label class="field">
+        <span>호칭</span>
+        <input type="text" id="setName" placeholder="제국아" autocomplete="off">
+      </label>
+      <p class="note">아버님을 부를 때 쓰는 말이에요. 예: 제국아, 아버지</p>
+    </section>
+
+    <section class="grp">
+      <h3>아침 인사</h3>
+      <label class="field row">
+        <span>자동 인사</span>
+        <input type="checkbox" id="setAutoGreet">
+      </label>
+      <label class="field">
+        <span>인사 시각</span>
+        <input type="time" id="setGreetTime" value="06:00">
+      </label>
+      <div class="btnrow">
+        <button class="sbtn" type="button" id="testMorning">지금 아침 인사 듣기</button>
+      </div>
+      <p class="note">앱이 화면에 켜져 있을 때 그 시각에 먼저 말을 걸어요. 휴대폰을 충전기에 꽂아 두고 화면을 켜 두시면 가장 잘 들려요.</p>
+    </section>
+
+    <section class="grp">
+      <h3>목소리</h3>
+      <label class="field">
+        <span>말하기 속도 <b id="rateVal">0.85</b></span>
+        <input type="range" id="setRate" min="0.6" max="1.2" step="0.05" value="0.85">
+      </label>
+      <label class="field">
+        <span>목소리</span>
+        <select id="setVoice"><option value="">기본 목소리</option></select>
+      </label>
+      <div class="btnrow">
+        <button class="sbtn" type="button" id="testVoice">이 목소리로 들어보기</button>
+      </div>
+    </section>
+
+    <section class="grp">
+      <h3>대화</h3>
+      <label class="field row">
+        <span>대답 자동으로 듣기</span>
+        <input type="checkbox" id="setAutoListen" checked>
+      </label>
+      <label class="field row">
+        <span>화면 켜 두기 (충전 중)</span>
+        <input type="checkbox" id="setWakeLock" checked>
+      </label>
+      <p class="note">자동 듣기를 켜면 다림이가 말을 마친 뒤 바로 마이크를 켜요. 잘 안 될 때는 [눌러서 대답하기] 버튼을 쓰시면 돼요.</p>
+    </section>
+
+    <section class="grp">
+      <h3>지역 (날씨)</h3>
+      <p class="note" id="locNow">설정된 지역을 불러오는 중…</p>
+      <div class="searchrow">
+        <input type="text" id="locQuery" placeholder="동네 이름 (예: 아산, 배방, 유구)" autocomplete="off">
+        <button class="sbtn" type="button" id="locSearchBtn">찾기</button>
+      </div>
+      <div class="results" id="locResults"></div>
+      <div class="btnrow">
+        <button class="sbtn" type="button" id="locGps">이 휴대폰 위치로</button>
+      </div>
+    </section>
+
+    <section class="grp">
+      <h3>대화 기록</h3>
+      <p class="note" id="histSummary">기록을 불러오는 중…</p>
+      <div class="btnrow">
+        <button class="sbtn" type="button" id="histView">기록 보기</button>
+        <button class="sbtn" type="button" id="histDownload">파일로 저장</button>
+        <button class="sbtn danger" type="button" id="histClear">기록 지우기</button>
+      </div>
+      <div class="histbox" id="histBox" hidden></div>
+    </section>
+
+    <details class="grp adv">
+      <summary>고급 (가족용 · 선택)</summary>
+      <p class="note">API 키를 넣으면 대화가 조금 더 자유로워져요. 키가 없어도 지금 그대로 잘 동작합니다. 키는 이 휴대폰 브라우저에만 저장돼요.</p>
+      <label class="field">
+        <span>사용</span>
+        <select id="setProvider">
+          <option value="none">사용 안 함 (내장 대화)</option>
+          <option value="openai">OpenAI</option>
+          <option value="gemini">Google Gemini</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>API 키</span>
+        <input type="password" id="setApiKey" placeholder="sk-… 또는 AIza…" autocomplete="off">
+      </label>
+      <label class="field">
+        <span>모델</span>
+        <input type="text" id="setModel" placeholder="gpt-4o-mini / gemini-2.0-flash" autocomplete="off">
+      </label>
+      <div class="btnrow">
+        <button class="sbtn" type="button" id="apiTest">연결 확인</button>
+      </div>
+      <p class="note" id="apiStatus"></p>
+    </details>
+
+    <section class="grp">
+      <h3>홈 화면에 추가</h3>
+      <p class="note">
+        <b>안드로이드(크롬):</b> 오른쪽 위 ⋮ → <b>홈 화면에 추가</b><br>
+        <b>아이폰(사파리):</b> 아래 공유 버튼 → <b>홈 화면에 추가</b><br>
+        이렇게 하면 아이콘만 눌러 앱처럼 열 수 있어요.
+      </p>
+      <p class="note" id="swNote"></p>
+    </section>
+
+    <p class="note version">제국아 말벗 · 가족이 만든 목소리 말벗</p>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="js/storage.js"></script>
+<script src="js/weather.js"></script>
+<script src="js/speech.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
